@@ -21,14 +21,14 @@ export const NeoLoader: React.FC = () => (
 );
 
 // --- Card ---
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
   color?: string;
   noShadow?: boolean;
 }
-export const NeoCard: React.FC<CardProps> = ({ children, className = '', color = 'bg-white', noShadow = false }) => (
-  <div className={`${color} border-2 border-black rounded-xl p-4 ${noShadow ? '' : 'shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'} ${className}`}>
+export const NeoCard: React.FC<CardProps> = ({ children, className = '', color = 'bg-white', noShadow = false, ...props }) => (
+  <div className={`${color} border-2 border-black rounded-xl p-4 ${noShadow ? '' : 'shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'} ${className}`} {...props}>
     {children}
   </div>
 );

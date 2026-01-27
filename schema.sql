@@ -51,11 +51,11 @@ drop policy if exists "Public Access SaleItems" on sale_items;
 create policy "Public Access SaleItems" on sale_items for all using (true);
 
 -- Storage
-drop policy if exists "Public Images" on storage.objects;
-create policy "Public Images" on storage.objects for select using ( bucket_id = 'product-images' );
+drop policy if exists "Public Images Select" on storage.objects;
+create policy "Public Images Select" on storage.objects for select using ( bucket_id = 'product-images' );
 
-drop policy if exists "Upload Images" on storage.objects;
-create policy "Upload Images" on storage.objects for insert using ( bucket_id = 'product-images' );
+drop policy if exists "Upload Images Insert" on storage.objects;
+create policy "Upload Images Insert" on storage.objects for insert with check ( bucket_id = 'product-images' );
 
 -- RPC for Stock Update
 create or replace function decrement_stock(row_id uuid, amount int)
