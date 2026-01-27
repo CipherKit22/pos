@@ -12,9 +12,12 @@ export const Cashier: React.FC = () => {
   
   // Payment Modal State
   const [isPayModalOpen, setPayModalOpen] = useState(false);
-  const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
-  const [cashInput, setCashInput] = useState<string>('');
-  const [kpayInput, setKpayInput] = useState<string>('');
+  
+  // New Payment State
+  const [cashReceived, setCashReceived] = useState<string>('');
+  const [kpayReceived, setKpayReceived] = useState<string>('');
+  const [changeMethod, setChangeMethod] = useState<'CASH' | 'KPAY'>('CASH');
+  
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -72,40 +75,47 @@ export const Cashier: React.FC = () => {
 
   const handleOpenPayment = () => {
     if (cart.length === 0) return;
-    setCashInput(cartTotal.toString()); // Default to full cash
-    setKpayInput('0');
-    setPaymentType('CASH');
+    setCashReceived(''); // Reset
+    setKpayReceived('');
+    setChangeMethod('CASH'); // Default change via cash
     setPayModalOpen(true);
   };
 
-  const handleCashChange = (val: string) => {
-    setCashInput(val);
-    if (paymentType === 'MIXED') {
-      const c = parseInt(val) || 0;
-      setKpayInput((Math.max(0, cartTotal - c)).toString());
-    }
-  };
-
-  const handleKpayChange = (val: string) => {
-    setKpayInput(val);
-    if (paymentType === 'MIXED') {
-      const k = parseInt(val) || 0;
-      setCashInput((Math.max(0, cartTotal - k)).toString());
-    }
-  };
+  // Calculations
+  const cReceived = parseInt(cashReceived) || 0;
+  const kReceived = parseInt(kpayReceived) || 0;
+  const totalReceived = cReceived + kReceived;
+  const change = totalReceived - cartTotal;
+  const isSufficient = change >= 0;
 
   const handleConfirmSale = async () => {
+    if (!isSufficient) return;
     setSubmitting(true);
-    const cAmount = parseInt(cashInput) || 0;
-    const kAmount = parseInt(kpayInput) || 0;
 
-    // Validate
-    if ((cAmount + kAmount) < cartTotal) {
-      alert('ပေးချေမှုပမာဏ မလုံလောက်ပါ (Insufficient Payment)');
-      setSubmitting(false);
-      return;
+    // Calculate Nets
+    const changeAmt = change;
+    let netCash = cReceived;
+    let netKpay = kReceived;
+
+    if (changeAmt > 0) {
+      if (changeMethod === 'CASH') {
+        netCash -= changeAmt;
+      } else {
+        netKpay -= changeAmt;
+      }
     }
 
+    // Determine Payment Type for Record
+    let pType: PaymentType = 'CASH';
+    if (cReceived > 0 && kReceived > 0) {
+        pType = 'MIXED';
+    } else if (kReceived > 0) {
+        pType = 'KPAY';
+    } else if (cReceived > 0 && changeAmt > 0 && changeMethod === 'KPAY') {
+        // Specific case: Cash Payment but KPay Change
+        pType = 'CASH_WITH_KPAY_CHANGE';
+    }
+    
     // Profit Calc
     const totalBuyPrice = cart.reduce((sum, item) => sum + (item.buy_price * item.qty), 0);
     const profit = cartTotal - totalBuyPrice;
@@ -114,9 +124,16 @@ export const Cashier: React.FC = () => {
       await db.createSale({
         total: cartTotal,
         profit,
-        payment_type: paymentType,
-        cash_amount: paymentType === 'KPAY' ? 0 : cAmount,
-        kpay_amount: paymentType === 'CASH' ? 0 : kAmount
+        payment_type: pType,
+        cash_amount: netCash, // Net impact on drawer
+        kpay_amount: netKpay, // Net impact on kpay balance
+        
+        // New Fields
+        cash_received: cReceived,
+        kpay_received: kReceived,
+        change_amount: changeAmt,
+        // Send NULL if no change, because DB constraint is check (change_method in ('CASH', 'KPAY'))
+        change_method: changeAmt > 0 ? changeMethod : null 
       }, cart.map(i => ({ product_id: i.id, qty: i.qty, price: i.sell_price })));
 
       setCart([]);
@@ -225,72 +242,84 @@ export const Cashier: React.FC = () => {
       </div>
 
       {/* Payment Modal */}
-      <NeoModal isOpen={isPayModalOpen} onClose={() => setPayModalOpen(false)} title="ငွေပေးချေမှုစနစ်">
+      <NeoModal isOpen={isPayModalOpen} onClose={() => setPayModalOpen(false)} title="ငွေပေးချေမှု">
         <div className="space-y-6">
-           <div className="text-center mb-6">
-             <p className="text-gray-500">ပေးချေရမည့်ပမာဏ</p>
-             <h1 className="text-4xl font-bold text-purple-600">{cartTotal.toLocaleString()} Ks</h1>
+           <div className="text-center bg-gray-50 p-4 rounded-lg border border-black">
+             <p className="text-gray-500 text-sm font-bold uppercase">Total Due</p>
+             <h1 className="text-4xl font-black text-black">{cartTotal.toLocaleString()} Ks</h1>
            </div>
 
-           <div className="grid grid-cols-3 gap-2">
-             <NeoButton 
-               variant={paymentType === 'CASH' ? 'primary' : 'ghost'} 
-               className={paymentType === 'CASH' ? 'bg-[#B0F2B4]' : 'bg-gray-100'}
-               onClick={() => { setPaymentType('CASH'); setCashInput(cartTotal.toString()); setKpayInput('0'); }}
-             >
-               Cash
-             </NeoButton>
-             <NeoButton 
-               variant={paymentType === 'KPAY' ? 'primary' : 'ghost'} 
-               className={paymentType === 'KPAY' ? 'bg-[#A2D2FF]' : 'bg-gray-100'}
-               onClick={() => { setPaymentType('KPAY'); setKpayInput(cartTotal.toString()); setCashInput('0'); }}
-             >
-               KPay
-             </NeoButton>
-             <NeoButton 
-               variant={paymentType === 'MIXED' ? 'primary' : 'ghost'} 
-               className={paymentType === 'MIXED' ? 'bg-[#FFEF96]' : 'bg-gray-100'}
-               onClick={() => { setPaymentType('MIXED'); setCashInput(''); setKpayInput(''); }}
-             >
-               Mix
-             </NeoButton>
-           </div>
+           <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                  <NeoInput 
+                    label="Cash Received (လက်ခံ)"
+                    type="number" 
+                    value={cashReceived} 
+                    onChange={e => setCashReceived(e.target.value)} 
+                    placeholder="0"
+                    autoFocus
+                  />
+                  <NeoInput 
+                    label="KPay Received (လက်ခံ)"
+                    type="number" 
+                    value={kpayReceived} 
+                    onChange={e => setKpayReceived(e.target.value)}
+                    placeholder="0"
+                  />
+              </div>
 
-           <div className="space-y-4 p-4 bg-gray-50 rounded-xl border-2 border-black border-dashed text-black">
-              {/* Cash Input */}
-              {(paymentType === 'CASH' || paymentType === 'MIXED') && (
-                <div className="flex items-center gap-2">
-                   <label className="w-20 font-bold">Cash:</label>
-                   <NeoInput 
-                      type="number" 
-                      value={cashInput} 
-                      onChange={e => handleCashChange(e.target.value)} 
-                      disabled={paymentType === 'CASH'} // Auto filled if cash only
-                   />
+              {/* Summary Box */}
+              <div className="border-t-2 border-black pt-4">
+                 <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-600 font-bold">Total Received:</span>
+                    <span className="font-bold text-xl text-blue-600">{totalReceived.toLocaleString()} Ks</span>
+                 </div>
+                 
+                 {isSufficient ? (
+                   <div className="flex justify-between items-center p-3 bg-green-100 rounded-lg border-2 border-black">
+                      <span className="text-green-800 font-bold">Change (ပြန်အမ်းငွေ):</span>
+                      <span className="font-black text-2xl text-green-900">{change.toLocaleString()} Ks</span>
+                   </div>
+                 ) : (
+                   <div className="flex justify-between items-center p-3 bg-red-100 rounded-lg border-2 border-black">
+                      <span className="text-red-800 font-bold">Remaining (လိုငွေ):</span>
+                      <span className="font-black text-2xl text-red-900">{Math.abs(change).toLocaleString()} Ks</span>
+                   </div>
+                 )}
+              </div>
+
+              {/* Change Method Selection - Only show if there is change */}
+              {change > 0 && (
+                <div className="bg-[#FFF0F5] p-3 rounded-lg border border-black animate-in fade-in slide-in-from-top-2">
+                   <p className="font-bold text-sm mb-2 text-center text-black">ပြန်အမ်းမည့် ပုံစံ (Return Change Via):</p>
+                   <div className="flex gap-2">
+                      <button 
+                        onClick={() => setChangeMethod('CASH')}
+                        className={`flex-1 py-2 rounded font-bold border-2 border-black transition-all ${changeMethod === 'CASH' ? 'bg-[#B0F2B4] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] -translate-y-0.5' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                      >
+                        💵 CASH
+                      </button>
+                      <button 
+                        onClick={() => setChangeMethod('KPAY')}
+                        className={`flex-1 py-2 rounded font-bold border-2 border-black transition-all ${changeMethod === 'KPAY' ? 'bg-[#A2D2FF] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] -translate-y-0.5' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                      >
+                        📱 KPAY
+                      </button>
+                   </div>
+                   <p className="text-xs text-center mt-2 text-gray-500">
+                      {changeMethod === 'CASH' ? 'Cash will be deducted from drawer.' : 'Money will be sent via KPay.'}
+                   </p>
                 </div>
               )}
-
-              {/* KPay Input */}
-              {(paymentType === 'KPAY' || paymentType === 'MIXED') && (
-                <div className="flex items-center gap-2">
-                   <label className="w-20 font-bold">KPay:</label>
-                   <NeoInput 
-                      type="number" 
-                      value={kpayInput} 
-                      onChange={e => handleKpayChange(e.target.value)}
-                      disabled={paymentType === 'KPAY'}
-                   />
-                </div>
-              )}
            </div>
 
-           <div className="flex justify-between items-center text-sm font-bold text-gray-600 px-2">
-              <span>Total Received: {(parseInt(cashInput)||0) + (parseInt(kpayInput)||0)}</span>
-              <span>Required: {cartTotal}</span>
-           </div>
-
-           <NeoButton className="w-full bg-[#FFADE7]" size="lg" onClick={handleConfirmSale} disabled={submitting}>
-              {submitting ? 'Processing...' : 'အရောင်းအတည်ပြုမည်'}
+           <NeoButton 
+              className="w-full bg-[#FFADE7]" 
+              size="lg" 
+              onClick={handleConfirmSale} 
+              disabled={submitting || !isSufficient}
+           >
+              {submitting ? 'Processing...' : 'အတည်ပြုမည် (Confirm)'}
            </NeoButton>
         </div>
       </NeoModal>

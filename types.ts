@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -7,16 +8,23 @@ export interface Product {
   image_url: string | null;
 }
 
-export type PaymentType = 'CASH' | 'KPAY' | 'MIXED';
+export type PaymentType = 'CASH' | 'KPAY' | 'MIXED' | 'CASH_WITH_KPAY_CHANGE';
 
 export interface Sale {
   id: string;
   total: number;
   profit: number;
   payment_type: PaymentType;
-  cash_amount: number;
-  kpay_amount: number;
+  cash_amount: number; // Net cash (Received - Change)
+  kpay_amount: number; // Net kpay (Received - Change)
   created_at: string;
+  
+  // New Fields
+  cash_received?: number;
+  kpay_received?: number;
+  change_amount?: number;
+  change_method?: 'CASH' | 'KPAY' | null;
+  
   sale_items?: SaleItem[];
 }
 

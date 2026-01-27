@@ -84,6 +84,7 @@ export const Admin: React.FC = () => {
   const stats = useMemo(() => {
     const totalSales = sales.reduce((acc, s) => acc + s.total, 0);
     const totalProfit = sales.reduce((acc, s) => acc + s.profit, 0);
+    // cash_amount and kpay_amount are now NET amounts
     const cashTotal = sales.reduce((acc, s) => acc + s.cash_amount, 0);
     const kpayTotal = sales.reduce((acc, s) => acc + s.kpay_amount, 0);
     return { totalSales, totalProfit, cashTotal, kpayTotal };
@@ -112,6 +113,20 @@ export const Admin: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      await db.deleteProduct(id);
+      fetchData();
+    }
+  };
+
+  const getPaymentBadgeColor = (type: string) => {
+    if (type === 'KPAY') return 'bg-blue-200';
+    if (type === 'CASH') return 'bg-green-200';
+    if (type === 'CASH_WITH_KPAY_CHANGE') return 'bg-purple-200';
+    return 'bg-yellow-200'; // MIXED
   };
 
   if (!isAuthenticated) {
@@ -219,12 +234,14 @@ export const Admin: React.FC = () => {
                      <h2 className="text-3xl font-black text-blue-900">{stats.totalProfit.toLocaleString()} Ks</h2>
                   </NeoCard>
                   <NeoCard color="bg-[#B0F2B4]">
-                     <p className="font-bold mb-2">Cash ရရှိငွေ</p>
+                     <p className="font-bold mb-2">Net Cash Drawer</p>
                      <h2 className="text-3xl font-black text-green-900">{stats.cashTotal.toLocaleString()} Ks</h2>
+                     <p className="text-xs mt-1 text-gray-600 font-bold">Includes cash payments & refunds</p>
                   </NeoCard>
                   <NeoCard color="bg-[#FFEF96]">
-                     <p className="font-bold mb-2">KPay ရရှိငွေ</p>
-                     <h2 className="text-3xl font-black text-orange-900">{stats.kpayTotal.toLocaleString()} Ks</h2>
+                     <p className="font-bold mb-2">Net KPay Balance</p>
+                     <h2 className={`text-3xl font-black ${stats.kpayTotal < 0 ? 'text-red-600' : 'text-orange-900'}`}>{stats.kpayTotal.toLocaleString()} Ks</h2>
+                     <p className="text-xs mt-1 text-gray-600 font-bold">Includes KPay in & KPay change out</p>
                   </NeoCard>
                   
                   <div className="col-span-full md:col-span-2 mt-4">
@@ -236,7 +253,7 @@ export const Admin: React.FC = () => {
             )}
 
             {/* SALES TAB */}
-            {activeTab === AdminTab.SALES && (
+            {(activeTab === AdminTab.SALES || activeTab === AdminTab.PAYMENTS) && (
                <NeoCard className="overflow-hidden p-0" color="bg-white">
                  <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -244,8 +261,9 @@ export const Admin: React.FC = () => {
                         <tr>
                           <th className="p-4">Time</th>
                           <th className="p-4">Total</th>
-                          <th className="p-4">Profit</th>
                           <th className="p-4">Payment</th>
+                          <th className="p-4">Net Cash</th>
+                          <th className="p-4">Net KPay</th>
                           <th className="p-4">Action</th>
                         </tr>
                       </thead>
@@ -254,17 +272,25 @@ export const Admin: React.FC = () => {
                           <tr key={sale.id} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
                             <td className="p-4 font-mono text-sm">{new Date(sale.created_at).toLocaleString()}</td>
                             <td className="p-4 font-bold">{sale.total.toLocaleString()}</td>
-                            <td className="p-4 text-green-600 font-bold">+{sale.profit.toLocaleString()}</td>
                             <td className="p-4">
-                              <NeoBadge color={sale.payment_type === 'KPAY' ? 'bg-blue-200' : sale.payment_type === 'CASH' ? 'bg-green-200' : 'bg-yellow-200'}>
-                                 {sale.payment_type}
+                              <NeoBadge color={getPaymentBadgeColor(sale.payment_type)}>
+                                 {sale.payment_type.replace(/_/g, ' ')}
                               </NeoBadge>
                             </td>
+                            <td className="p-4 font-mono text-sm">
+                               {sale.cash_amount > 0 ? `+${sale.cash_amount.toLocaleString()}` : sale.cash_amount === 0 ? '-' : sale.cash_amount.toLocaleString()}
+                            </td>
+                            <td className="p-4 font-mono text-sm">
+                               {sale.kpay_amount > 0 ? `+${sale.kpay_amount.toLocaleString()}` : sale.kpay_amount === 0 ? '-' : sale.kpay_amount.toLocaleString()}
+                            </td>
                             <td className="p-4">
-                               <button onClick={() => setSelectedSale(sale)} className="text-sm underline decoration-2 decoration-purple-400 hover:text-purple-600 font-bold">Detail</button>
+                               <button onClick={() => setSelectedSale(sale)} className="text-sm underline decoration-2 decoration-purple-500 font-bold">View</button>
                             </td>
                           </tr>
                         ))}
+                        {sales.length === 0 && (
+                          <tr><td colSpan={6} className="p-8 text-center text-gray-400">အရောင်းမှတ်တမ်းမရှိပါ</td></tr>
+                        )}
                       </tbody>
                     </table>
                  </div>
@@ -273,147 +299,160 @@ export const Admin: React.FC = () => {
 
             {/* PRODUCTS TAB */}
             {activeTab === AdminTab.PRODUCTS && (
-              <div>
-                <div className="flex justify-end mb-4">
-                   <NeoButton className="bg-[#B0F2B4]" onClick={() => { setEditProduct({}); setProductModalOpen(true); }}>+ ပစ္စည်းအသစ်ထည့်မည်</NeoButton>
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                   <NeoButton onClick={() => { setEditProduct({}); setProductModalOpen(true); }}>
+                      + New Product
+                   </NeoButton>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                   {products.map(prod => (
-                     <NeoCard key={prod.id} className="relative group" color="bg-white">
-                        <div className="flex gap-4">
-                           <div className="w-16 h-16 bg-gray-200 rounded border border-black overflow-hidden flex-shrink-0">
-                              {prod.image_url && <img src={prod.image_url} className="w-full h-full object-cover" />}
-                           </div>
-                           <div className="text-black">
-                              <h3 className="font-bold">{prod.name}</h3>
-                              <p className="text-sm text-gray-500">Stock: {prod.stock}</p>
-                              <p className="text-sm font-bold text-purple-600">{prod.sell_price} Ks</p>
-                           </div>
-                        </div>
-                        <button 
-                          className="absolute top-2 right-2 p-2 bg-yellow-200 border border-black rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => { setEditProduct(prod); setProductModalOpen(true); }}
-                        >
-                          ✏️
-                        </button>
-                     </NeoCard>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {products.map(p => (
+                      <NeoCard key={p.id} className="flex gap-4 items-center" color="bg-white">
+                         <div className="w-16 h-16 bg-gray-100 rounded border border-black overflow-hidden flex-shrink-0">
+                           {p.image_url && <img src={p.image_url} alt="" className="w-full h-full object-cover"/>}
+                         </div>
+                         <div className="flex-1">
+                            <h3 className="font-bold text-lg">{p.name}</h3>
+                            <div className="text-sm text-gray-600">
+                               Buy: {p.buy_price} | Sell: {p.sell_price} | Stock: {p.stock}
+                            </div>
+                         </div>
+                         <div className="flex gap-2">
+                            <button onClick={() => { setEditProduct(p); setProductModalOpen(true); }} className="p-2 hover:bg-blue-100 rounded text-blue-600 font-bold">Edit</button>
+                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 hover:bg-red-100 rounded text-red-600 font-bold">Del</button>
+                         </div>
+                      </NeoCard>
                    ))}
                 </div>
               </div>
-            )}
-            
-            {/* PAYMENTS TAB */}
-            {activeTab === AdminTab.PAYMENTS && (
-                 <div className="space-y-4">
-                   <NeoCard color="bg-white">
-                      <h3 className="font-bold text-xl mb-4 text-black">Payment Breakdown</h3>
-                      <div className="space-y-4 text-black">
-                          <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
-                              <span className="font-bold">Total Cash Collected</span>
-                              <span className="text-xl">{stats.cashTotal.toLocaleString()} Ks</span>
-                          </div>
-                          <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
-                              <span className="font-bold">Total KPay Received</span>
-                              <span className="text-xl">{stats.kpayTotal.toLocaleString()} Ks</span>
-                          </div>
-                      </div>
-                   </NeoCard>
-                 </div>
             )}
           </>
         )}
       </div>
 
-      {/* --- Modals --- */}
-
       {/* Sale Detail Modal */}
-      <NeoModal isOpen={!!selectedSale} onClose={() => setSelectedSale(null)} title="အရောင်းမှတ်တမ်း">
-         {selectedSale && (
+      <NeoModal isOpen={!!selectedSale} onClose={() => setSelectedSale(null)} title="အရောင်းအသေးစိတ် (Sale Details)">
+        {selectedSale && (
            <div className="space-y-4 text-black">
-              <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded border border-black">
-                 <div>
-                   <span className="block text-gray-500">Date</span>
-                   <b>{new Date(selectedSale.created_at).toLocaleString()}</b>
-                 </div>
-                 <div>
-                   <span className="block text-gray-500">Payment</span>
-                   <b>{selectedSale.payment_type}</b>
-                 </div>
-                 {selectedSale.payment_type !== 'CASH' && (
-                   <div>
-                     <span className="block text-gray-500">KPay</span>
-                     <b>{selectedSale.kpay_amount} Ks</b>
-                   </div>
-                 )}
-                 {selectedSale.payment_type !== 'KPAY' && (
-                   <div>
-                     <span className="block text-gray-500">Cash</span>
-                     <b>{selectedSale.cash_amount} Ks</b>
-                   </div>
-                 )}
+              <div className="flex justify-between font-bold text-xl border-b-2 border-black pb-2">
+                <span>Total Bill</span>
+                <span>{selectedSale.total.toLocaleString()} Ks</span>
               </div>
               
-              <div className="border-t-2 border-black pt-4">
-                <h4 className="font-bold mb-2">Items</h4>
-                <ul className="space-y-2">
-                   {selectedSale.sale_items?.map((item, idx) => (
-                      <li key={idx} className="flex justify-between border-b border-gray-200 pb-1">
-                         <span>{item.product?.name || 'Unknown'} <small className="text-gray-500">x{item.qty}</small></span>
-                         <span>{(item.qty * item.price).toLocaleString()}</span>
-                      </li>
-                   ))}
-                </ul>
-                <div className="flex justify-between mt-4 text-xl font-bold">
-                   <span>Total</span>
-                   <span>{selectedSale.total.toLocaleString()} Ks</span>
+              {/* Payment Info */}
+              <div className="bg-gray-50 p-3 rounded border border-black">
+                <p className="font-bold text-sm mb-2 uppercase text-gray-500">Payment Received (လက်ခံငွေ)</p>
+                <div className="flex justify-between mb-1">
+                   <span>💵 Cash In:</span>
+                   <span className="font-mono font-bold">{selectedSale.cash_received?.toLocaleString() || 0} Ks</span>
+                </div>
+                <div className="flex justify-between">
+                   <span>📱 KPay In:</span>
+                   <span className="font-mono font-bold">{selectedSale.kpay_received?.toLocaleString() || 0} Ks</span>
                 </div>
               </div>
+
+              {/* Change Info */}
+              {(selectedSale.change_amount || 0) > 0 && (
+                <div className="bg-yellow-50 p-3 rounded border border-black">
+                  <p className="font-bold text-sm mb-2 uppercase text-yellow-800">Change Returned (ပြန်အမ်းငွေ)</p>
+                  <div className="flex justify-between mb-1 text-red-600 font-bold">
+                     <span>Total Change:</span>
+                     <span>-{selectedSale.change_amount?.toLocaleString()} Ks</span>
+                  </div>
+                  <div className="flex justify-between text-sm items-center">
+                     <span>Returned Via:</span>
+                     <NeoBadge color={selectedSale.change_method === 'KPAY' ? 'bg-[#A2D2FF]' : 'bg-[#B0F2B4]'}>
+                        {selectedSale.change_method || 'CASH'}
+                     </NeoBadge>
+                  </div>
+                </div>
+              )}
+
+              {/* Net Impact */}
+              <div className="bg-blue-50 p-3 rounded border border-black">
+                 <p className="font-bold text-sm mb-2 uppercase text-blue-800">Net Balance Impact</p>
+                 <div className="flex justify-between mb-1">
+                    <span>Cash Drawer:</span>
+                    <span className={`font-mono font-bold ${selectedSale.cash_amount < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                      {selectedSale.cash_amount > 0 ? '+' : ''}{selectedSale.cash_amount.toLocaleString()} Ks
+                    </span>
+                 </div>
+                 <div className="flex justify-between">
+                    <span>KPay Balance:</span>
+                    <span className={`font-mono font-bold ${selectedSale.kpay_amount < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                       {selectedSale.kpay_amount > 0 ? '+' : ''}{selectedSale.kpay_amount.toLocaleString()} Ks
+                    </span>
+                 </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="mt-4">
+                 <h4 className="font-bold mb-2">Items Sold</h4>
+                 <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-300 text-left text-gray-500">
+                        <th className="pb-1">Item</th>
+                        <th className="pb-1 text-right">Qty</th>
+                        <th className="pb-1 text-right">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                       {selectedSale.sale_items?.map((item, idx) => (
+                         <tr key={idx} className="border-b border-gray-100">
+                            <td className="py-2">{item.product?.name || 'Unknown'}</td>
+                            <td className="py-2 text-right">{item.qty}</td>
+                            <td className="py-2 text-right">{item.price.toLocaleString()}</td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
            </div>
-         )}
+        )}
       </NeoModal>
 
-      {/* Product Edit/Add Modal */}
-      <NeoModal isOpen={isProductModalOpen} onClose={() => setProductModalOpen(false)} title={editProduct.id ? 'ပစ္စည်းပြင်ဆင်ရန်' : 'ပစ္စည်းအသစ်'}>
+      {/* Product Edit Modal */}
+      <NeoModal isOpen={isProductModalOpen} onClose={() => setProductModalOpen(false)} title={editProduct.id ? 'Edit Product' : 'Add Product'}>
          <div className="space-y-4">
             <NeoInput 
-              label="Product Name (အမည်)" 
-              value={editProduct.name || ''} 
-              onChange={e => setEditProduct({...editProduct, name: e.target.value})} 
+               label="Product Name" 
+               value={editProduct.name || ''} 
+               onChange={e => setEditProduct({...editProduct, name: e.target.value})}
             />
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-4">
                <NeoInput 
-                 label="Buy Price (ဝယ်ဈေး)" 
-                 type="number"
-                 value={editProduct.buy_price || ''} 
-                 onChange={e => setEditProduct({...editProduct, buy_price: Number(e.target.value)})} 
+                  label="Buy Price" 
+                  type="number" 
+                  value={editProduct.buy_price || ''} 
+                  onChange={e => setEditProduct({...editProduct, buy_price: Number(e.target.value)})}
                />
                <NeoInput 
-                 label="Sell Price (ရောင်းဈေး)" 
-                 type="number"
-                 value={editProduct.sell_price || ''} 
-                 onChange={e => setEditProduct({...editProduct, sell_price: Number(e.target.value)})} 
+                  label="Sell Price" 
+                  type="number" 
+                  value={editProduct.sell_price || ''} 
+                  onChange={e => setEditProduct({...editProduct, sell_price: Number(e.target.value)})}
                />
             </div>
             <NeoInput 
-                 label="Stock (လက်ကျန်)" 
-                 type="number"
-                 value={editProduct.stock || ''} 
-                 onChange={e => setEditProduct({...editProduct, stock: Number(e.target.value)})} 
+               label="Stock" 
+               type="number" 
+               value={editProduct.stock || ''} 
+               onChange={e => setEditProduct({...editProduct, stock: Number(e.target.value)})}
             />
             
-            <div className="w-full text-black">
-               <label className="block font-bold mb-1 text-sm">Image</label>
+            <div className="border-2 border-dashed border-black rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 relative">
                <input 
                  type="file" 
-                 accept="image/*"
-                 onChange={e => e.target.files && setImageFile(e.target.files[0])}
-                 className="w-full border-2 border-black rounded-lg p-2 bg-white"
+                 className="absolute inset-0 opacity-0 cursor-pointer"
+                 onChange={e => e.target.files && setImageFile(e.target.files[0])} 
                />
-               {(editProduct.image_url || imageFile) && <p className="text-xs text-green-600 mt-1">Image selected</p>}
+               <p className="font-bold text-gray-500">{imageFile ? imageFile.name : 'Click to upload image'}</p>
             </div>
 
-            <NeoButton className="w-full bg-[#A2D2FF] mt-4" onClick={handleSaveProduct} disabled={loading}>
-              {loading ? 'Saving...' : 'သိမ်းဆည်းမည်'}
+            <NeoButton onClick={handleSaveProduct} disabled={loading} className="w-full">
+               {loading ? 'Saving...' : 'Save Product'}
             </NeoButton>
          </div>
       </NeoModal>

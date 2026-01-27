@@ -66,3 +66,25 @@ begin
   where id = row_id;
 end;
 $$ language plpgsql;
+
+-- --- SCHEMA UPDATES FOR NEW PAYMENT LOGIC ---
+-- These allow running the script multiple times without error
+
+do $$ 
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'cash_received') then
+    alter table sales add column cash_received numeric default 0;
+  end if;
+
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'kpay_received') then
+    alter table sales add column kpay_received numeric default 0;
+  end if;
+
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'change_amount') then
+    alter table sales add column change_amount numeric default 0;
+  end if;
+
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'change_method') then
+    alter table sales add column change_method text check (change_method in ('CASH', 'KPAY', 'NONE')) default 'NONE';
+  end if;
+end $$;
