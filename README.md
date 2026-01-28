@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Kyite POS (ကြိုက် POS) User Guide
 
-# Run and deploy your AI Studio app
+A simple, cute Point of Sale system designed for Myanmar businesses.
 
-This contains everything you need to run your app locally.
+## 🏪 Cashier Mode (Main Screen)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1VwVABHdfLBophmaL6L7JSGCGehNUFmpU
+The main screen is used for daily sales operations.
 
-## Run Locally
+1.  **Add Items**: Click on product cards to add them to the cart.
+2.  **Search**: Use the search bar at the top to find specific items.
+3.  **Manage Cart**:
+    *   Adjust quantity using `+` and `-` buttons in the sidebar.
+    *   Remove items using the `×` button.
+4.  **Checkout**:
+    *   Click the **"ငွေချေမည် (Confirm)"** button.
+    *   Enter the amount received in **Cash** and/or **KPay**.
+    *   **Change Handling**: If the customer pays more than the total, select how you are returning the change (Cash or KPay).
+    *   Click **Confirm** to complete the sale.
 
-**Prerequisites:**  Node.js
+## 🔐 Admin Dashboard
 
+Manage your inventory and view sales reports.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1.  **Access**: Click the **"Admin"** button on the top right of the Cashier screen.
+2.  **Login**: Enter the PIN **`1234`**.
+
+### Features
+
+*   **Overview**: 
+    *   View charts and statistics for Sales, Profit, and Net Balances.
+    *   Filter data by **Today**, **Week**, **Month**, or **All Time**.
+*   **Sales History**:
+    *   View a chronological list of transactions.
+    *   Click **View** on any row to see specific details (items sold, exact cash/kpay received, and change returned).
+*   **Product Management**:
+    *   **Add**: Click `+ New Product` to register new items. You can upload an image and set Buy/Sell prices.
+    *   **Edit**: Click the "Edit" button on a product card to update stock or prices.
+    *   **Delete**: Click "Del" to remove a product. *Note: Past sales data for deleted products is preserved.*

@@ -6,6 +6,7 @@ export interface Product {
   sell_price: number;
   stock: number;
   image_url: string | null;
+  is_deleted?: boolean;
 }
 
 export type PaymentType = 'CASH' | 'KPAY' | 'MIXED' | 'CASH_WITH_KPAY_CHANGE';

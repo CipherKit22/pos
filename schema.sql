@@ -88,3 +88,11 @@ begin
     alter table sales add column change_method text check (change_method in ('CASH', 'KPAY', 'NONE')) default 'NONE';
   end if;
 end $$;
+
+-- --- SCHEMA UPDATES FOR SOFT DELETE ---
+do $$ 
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'is_deleted') then
+    alter table products add column is_deleted boolean default false;
+  end if;
+end $$;

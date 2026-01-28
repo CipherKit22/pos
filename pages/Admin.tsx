@@ -117,8 +117,16 @@ export const Admin: React.FC = () => {
 
   const handleDeleteProduct = async (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
-      await db.deleteProduct(id);
-      fetchData();
+      setLoading(true);
+      try {
+        await db.deleteProduct(id);
+        await fetchData();
+      } catch (e) {
+        alert('Error deleting product');
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 

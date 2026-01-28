@@ -7,6 +7,7 @@ export const db = {
     const { data, error } = await supabase
       .from('products')
       .select('*')
+      .eq('is_deleted', false)
       .order('name');
     if (error) throw error;
     return data as Product[];
@@ -25,7 +26,11 @@ export const db = {
   },
 
   deleteProduct: async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    // Soft delete to preserve sales history
+    const { error } = await supabase
+      .from('products')
+      .update({ is_deleted: true })
+      .eq('id', id);
     if (error) throw error;
   },
 
