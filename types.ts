@@ -2,8 +2,7 @@
 export interface Product {
   id: string;
   name: string;
-  buy_price: number;
-  sell_price: number;
+  price: number;
   stock: number;
   image_url: string | null;
   is_deleted?: boolean;
@@ -16,7 +15,6 @@ export interface Sale {
   customer_name?: string;
   customer_phone?: string;
   total: number;
-  profit: number;
   payment_type: PaymentType;
   cash_amount: number; 
   mobile_money_amount: number; 

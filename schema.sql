@@ -6,8 +6,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists products (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
-  buy_price numeric not null default 0,
-  sell_price numeric not null default 0,
+  price numeric not null default 0,
   stock integer not null default 0,
   image_url text,
   is_deleted boolean default false
@@ -19,7 +18,6 @@ create table if not exists sales (
   customer_name text,
   customer_phone text,
   total numeric not null,
-  profit numeric not null,
   payment_type text, -- CASH, KBZPAY, WAVEPAY, AYAPAY
   cash_amount numeric default 0, 
   mobile_money_amount numeric default 0, 
@@ -77,6 +75,11 @@ $$ language plpgsql;
 
 do $$ 
 begin
+  if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'price') then
+    alter table products add column price numeric not null default 0;
+    update products set price = sell_price;
+  end if;
+
   if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'customer_name') then
     alter table sales add column customer_name text;
   end if;

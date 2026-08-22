@@ -68,7 +68,7 @@ export const Cashier: React.FC = () => {
     });
   };
 
-  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.sell_price * item.qty), 0), [cart]);
+  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.qty), 0), [cart]);
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -92,23 +92,18 @@ export const Cashier: React.FC = () => {
     if (!isSufficient) return;
     setSubmitting(true);
 
-    // Profit Calc
-    const totalBuyPrice = cart.reduce((sum, item) => sum + (item.buy_price * item.qty), 0);
-    const profit = cartTotal - totalBuyPrice;
-
     try {
       await db.createSale({
         customer_name: customerName || undefined,
         customer_phone: customerPhone || undefined,
         total: cartTotal,
-        profit,
         payment_type: paymentType,
         cash_amount: paymentType === 'CASH' ? cartTotal : 0, 
         mobile_money_amount: paymentType !== 'CASH' ? cartTotal : 0, 
         
         cash_received: paymentType === 'CASH' ? cReceived : undefined,
         change_amount: paymentType === 'CASH' ? change : undefined,
-      }, cart.map(i => ({ product_id: i.id, qty: i.qty, price: i.sell_price })));
+      }, cart.map(i => ({ product_id: i.id, qty: i.qty, price: i.price })));
 
       setCart([]);
       setPayModalOpen(false);
@@ -159,7 +154,7 @@ export const Cashier: React.FC = () => {
               <div>
                 <h3 className="font-bold text-lg text-black leading-tight mb-1">{p.name}</h3>
                 <div className="flex justify-between items-center">
-                  <span className="text-purple-600 font-bold">{p.sell_price.toLocaleString()} Ks</span>
+                  <span className="text-purple-600 font-bold">{p.price.toLocaleString()} Ks</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full border border-black text-black ${p.stock < 5 ? 'bg-red-200' : 'bg-green-200'}`}>
                     {p.stock} left
                   </span>
@@ -186,7 +181,7 @@ export const Cashier: React.FC = () => {
               <div key={item.id} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-black">
                 <div className="flex-1 text-black">
                   <p className="font-bold text-sm truncate">{item.name}</p>
-                  <p className="text-xs text-gray-600">{item.sell_price.toLocaleString()} x {item.qty}</p>
+                  <p className="text-xs text-gray-600">{item.price.toLocaleString()} x {item.qty}</p>
                 </div>
                 <div className="flex items-center gap-2">
                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center bg-white border border-black rounded hover:bg-red-100 text-black">-</button>

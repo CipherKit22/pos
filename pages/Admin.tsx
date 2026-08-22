@@ -78,14 +78,13 @@ export const Admin: React.FC = () => {
 
   const stats = useMemo(() => {
     const totalSales = sales.reduce((acc, s) => acc + s.total, 0);
-    const totalProfit = sales.reduce((acc, s) => acc + s.profit, 0);
     const cashTotal = sales.reduce((acc, s) => acc + (s.cash_amount || 0), 0);
     const mobileTotal = sales.reduce((acc, s) => acc + (s.mobile_money_amount || 0), 0);
-    return { totalSales, totalProfit, cashTotal, mobileTotal };
+    return { totalSales, cashTotal, mobileTotal };
   }, [sales]);
 
   const handleSaveProduct = async () => {
-    if (!editProduct.name || !editProduct.sell_price) return;
+    if (!editProduct.name || !editProduct.price) return;
     setLoading(true);
     try {
       let imageUrl = editProduct.image_url;
@@ -215,14 +214,10 @@ export const Admin: React.FC = () => {
           <>
             {/* OVERVIEW TAB */}
             {activeTab === AdminTab.OVERVIEW && (
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <NeoCard color="bg-[#FFADE7]">
-                     <p className="font-bold mb-2">စုစုပေါင်းရောင်းအား</p>
+                     <p className="font-bold mb-2">စုစုပေါင်းရောင်းအား (Total Sales)</p>
                      <h2 className="text-3xl font-black">{stats.totalSales.toLocaleString()} Ks</h2>
-                  </NeoCard>
-                  <NeoCard color="bg-[#A2D2FF]">
-                     <p className="font-bold mb-2">စုစုပေါင်းအမြတ်</p>
-                     <h2 className="text-3xl font-black text-blue-900">{stats.totalProfit.toLocaleString()} Ks</h2>
                   </NeoCard>
                   <NeoCard color="bg-[#B0F2B4]">
                      <p className="font-bold mb-2">Net Cash Drawer</p>
@@ -235,7 +230,7 @@ export const Admin: React.FC = () => {
                      <p className="text-xs mt-1 text-gray-600 font-bold">Includes KBZPay, WavePay, AYAPay</p>
                   </NeoCard>
                   
-                  <div className="col-span-full md:col-span-2 mt-4">
+                  <div className="col-span-full mt-4">
                     <NeoCard className="min-h-[300px] flex items-center justify-center text-gray-400 font-bold bg-white">
                         <RechartsWrapper data={sales} />
                     </NeoCard>
@@ -300,7 +295,7 @@ export const Admin: React.FC = () => {
                          <div className="flex-1">
                             <h3 className="font-bold text-lg">{p.name}</h3>
                             <div className="text-sm text-gray-600">
-                               Buy: {p.buy_price} | Sell: {p.sell_price} | Stock: {p.stock}
+                               Price: {p.price.toLocaleString()} Ks | Stock: {p.stock}
                             </div>
                          </div>
                          <div className="flex gap-2">
@@ -401,24 +396,18 @@ export const Admin: React.FC = () => {
             />
             <div className="grid grid-cols-2 gap-4">
                <NeoInput 
-                  label="Buy Price" 
+                  label="Price (ရောင်းဈေး)" 
                   type="number" 
-                  value={editProduct.buy_price || ''} 
-                  onChange={e => setEditProduct({...editProduct, buy_price: Number(e.target.value)})}
+                  value={editProduct.price || ''} 
+                  onChange={e => setEditProduct({...editProduct, price: Number(e.target.value)})}
                />
                <NeoInput 
-                  label="Sell Price" 
+                  label="Stock" 
                   type="number" 
-                  value={editProduct.sell_price || ''} 
-                  onChange={e => setEditProduct({...editProduct, sell_price: Number(e.target.value)})}
+                  value={editProduct.stock || ''} 
+                  onChange={e => setEditProduct({...editProduct, stock: Number(e.target.value)})}
                />
             </div>
-            <NeoInput 
-               label="Stock" 
-               type="number" 
-               value={editProduct.stock || ''} 
-               onChange={e => setEditProduct({...editProduct, stock: Number(e.target.value)})}
-            />
             
             <div className="border-2 border-dashed border-black rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 relative">
                <input 
