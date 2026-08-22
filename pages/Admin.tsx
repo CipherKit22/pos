@@ -16,7 +16,7 @@ export const Admin: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   
   // Filters
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [dateFilter, setDateFilter] = useState<'all'>('all');
 
   // Modals
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -56,12 +56,7 @@ export const Admin: React.FC = () => {
     setLoading(true);
     try {
       const now = new Date();
-      let start = new Date();
-      start.setHours(0,0,0,0);
-      
-      if (dateFilter === 'week') start.setDate(now.getDate() - 7);
-      if (dateFilter === 'month') start.setMonth(now.getMonth() - 1);
-      if (dateFilter === 'all') start = new Date(0); 
+      let start = new Date(0); // Fetch all for single event day
 
       const [salesData, productsData] = await Promise.all([
         db.getSales(start, now),
@@ -84,10 +79,9 @@ export const Admin: React.FC = () => {
   const stats = useMemo(() => {
     const totalSales = sales.reduce((acc, s) => acc + s.total, 0);
     const totalProfit = sales.reduce((acc, s) => acc + s.profit, 0);
-    // cash_amount and kpay_amount are now NET amounts
-    const cashTotal = sales.reduce((acc, s) => acc + s.cash_amount, 0);
-    const kpayTotal = sales.reduce((acc, s) => acc + s.kpay_amount, 0);
-    return { totalSales, totalProfit, cashTotal, kpayTotal };
+    const cashTotal = sales.reduce((acc, s) => acc + (s.cash_amount || 0), 0);
+    const mobileTotal = sales.reduce((acc, s) => acc + (s.mobile_money_amount || 0), 0);
+    return { totalSales, totalProfit, cashTotal, mobileTotal };
   }, [sales]);
 
   const handleSaveProduct = async () => {
@@ -131,10 +125,10 @@ export const Admin: React.FC = () => {
   };
 
   const getPaymentBadgeColor = (type: string) => {
-    if (type === 'KPAY') return 'bg-blue-200';
-    if (type === 'CASH') return 'bg-green-200';
-    if (type === 'CASH_WITH_KPAY_CHANGE') return 'bg-purple-200';
-    return 'bg-yellow-200'; // MIXED
+    if (type === 'KBZPAY') return 'bg-blue-200';
+    if (type === 'WAVEPAY') return 'bg-yellow-200';
+    if (type === 'AYAPAY') return 'bg-red-200';
+    return 'bg-green-200'; // CASH
   };
 
   if (!isAuthenticated) {
@@ -193,17 +187,6 @@ export const Admin: React.FC = () => {
           <h1 className="text-3xl font-bold font-['Padauk'] text-black">စီမံခန့်ခွဲမှု (Admin)</h1>
           <p className="text-gray-600">ဆိုင်၏ အရောင်းစာရင်းနှင့် ပစ္စည်းစာရင်းများ</p>
         </div>
-        <div className="flex gap-2 bg-white p-1 rounded-lg border-2 border-black">
-          {(['today', 'week', 'month', 'all'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setDateFilter(f)}
-              className={`px-4 py-1 rounded md:text-sm text-xs font-bold transition-all text-black ${dateFilter === f ? 'bg-[#FFADE7] border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]' : 'hover:bg-gray-100'}`}
-            >
-              {f === 'today' ? 'ဒီနေ့' : f === 'week' ? 'ဒီအပတ်' : f === 'month' ? 'ဒီလ' : 'အားလုံး'}
-            </button>
-          ))}
-        </div>
         <NeoButton variant="secondary" onClick={() => navigate('/')}>Exit</NeoButton>
       </header>
 
@@ -247,9 +230,9 @@ export const Admin: React.FC = () => {
                      <p className="text-xs mt-1 text-gray-600 font-bold">Includes cash payments & refunds</p>
                   </NeoCard>
                   <NeoCard color="bg-[#FFEF96]">
-                     <p className="font-bold mb-2">Net KPay Balance</p>
-                     <h2 className={`text-3xl font-black ${stats.kpayTotal < 0 ? 'text-red-600' : 'text-orange-900'}`}>{stats.kpayTotal.toLocaleString()} Ks</h2>
-                     <p className="text-xs mt-1 text-gray-600 font-bold">Includes KPay in & KPay change out</p>
+                     <p className="font-bold mb-2">Net Mobile Payment</p>
+                     <h2 className={`text-3xl font-black text-orange-900`}>{stats.mobileTotal.toLocaleString()} Ks</h2>
+                     <p className="text-xs mt-1 text-gray-600 font-bold">Includes KBZPay, WavePay, AYAPay</p>
                   </NeoCard>
                   
                   <div className="col-span-full md:col-span-2 mt-4">
@@ -267,29 +250,23 @@ export const Admin: React.FC = () => {
                     <table className="w-full text-left">
                       <thead className="bg-gray-100 border-b-2 border-black text-black">
                         <tr>
+                          <th className="p-4">Customer</th>
                           <th className="p-4">Time</th>
                           <th className="p-4">Total</th>
                           <th className="p-4">Payment</th>
-                          <th className="p-4">Net Cash</th>
-                          <th className="p-4">Net KPay</th>
                           <th className="p-4">Action</th>
                         </tr>
                       </thead>
                       <tbody className="text-black">
                         {sales.map(sale => (
                           <tr key={sale.id} className="border-b border-gray-200 hover:bg-purple-50 transition-colors">
+                            <td className="p-4 font-bold">{sale.customer_name || 'N/A'}</td>
                             <td className="p-4 font-mono text-sm">{new Date(sale.created_at).toLocaleString()}</td>
                             <td className="p-4 font-bold">{sale.total.toLocaleString()}</td>
                             <td className="p-4">
                               <NeoBadge color={getPaymentBadgeColor(sale.payment_type)}>
-                                 {sale.payment_type.replace(/_/g, ' ')}
+                                 {sale.payment_type}
                               </NeoBadge>
-                            </td>
-                            <td className="p-4 font-mono text-sm">
-                               {sale.cash_amount > 0 ? `+${sale.cash_amount.toLocaleString()}` : sale.cash_amount === 0 ? '-' : sale.cash_amount.toLocaleString()}
-                            </td>
-                            <td className="p-4 font-mono text-sm">
-                               {sale.kpay_amount > 0 ? `+${sale.kpay_amount.toLocaleString()}` : sale.kpay_amount === 0 ? '-' : sale.kpay_amount.toLocaleString()}
                             </td>
                             <td className="p-4">
                                <button onClick={() => setSelectedSale(sale)} className="text-sm underline decoration-2 decoration-purple-500 font-bold">View</button>
@@ -343,6 +320,21 @@ export const Admin: React.FC = () => {
       <NeoModal isOpen={!!selectedSale} onClose={() => setSelectedSale(null)} title="အရောင်းအသေးစိတ် (Sale Details)">
         {selectedSale && (
            <div className="space-y-4 text-black">
+              {/* Customer Info */}
+              {(selectedSale.customer_name || selectedSale.customer_phone) && (
+                 <div className="bg-gray-100 p-3 rounded border border-black mb-4">
+                    <p className="font-bold text-sm mb-1 uppercase text-gray-600">Customer Info</p>
+                    <div className="flex justify-between">
+                       <span>Name:</span>
+                       <span className="font-bold">{selectedSale.customer_name || '-'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                       <span>Phone:</span>
+                       <span className="font-bold">{selectedSale.customer_phone || '-'}</span>
+                    </div>
+                 </div>
+              )}
+              
               <div className="flex justify-between font-bold text-xl border-b-2 border-black pb-2">
                 <span>Total Bill</span>
                 <span>{selectedSale.total.toLocaleString()} Ks</span>
@@ -350,49 +342,27 @@ export const Admin: React.FC = () => {
               
               {/* Payment Info */}
               <div className="bg-gray-50 p-3 rounded border border-black">
-                <p className="font-bold text-sm mb-2 uppercase text-gray-500">Payment Received (လက်ခံငွေ)</p>
+                <p className="font-bold text-sm mb-2 uppercase text-gray-500">Payment Summary</p>
                 <div className="flex justify-between mb-1">
-                   <span>💵 Cash In:</span>
-                   <span className="font-mono font-bold">{selectedSale.cash_received?.toLocaleString() || 0} Ks</span>
+                   <span>Method:</span>
+                   <NeoBadge color={getPaymentBadgeColor(selectedSale.payment_type)}>
+                      {selectedSale.payment_type}
+                   </NeoBadge>
                 </div>
-                <div className="flex justify-between">
-                   <span>📱 KPay In:</span>
-                   <span className="font-mono font-bold">{selectedSale.kpay_received?.toLocaleString() || 0} Ks</span>
-                </div>
-              </div>
-
-              {/* Change Info */}
-              {(selectedSale.change_amount || 0) > 0 && (
-                <div className="bg-yellow-50 p-3 rounded border border-black">
-                  <p className="font-bold text-sm mb-2 uppercase text-yellow-800">Change Returned (ပြန်အမ်းငွေ)</p>
-                  <div className="flex justify-between mb-1 text-red-600 font-bold">
-                     <span>Total Change:</span>
-                     <span>-{selectedSale.change_amount?.toLocaleString()} Ks</span>
-                  </div>
-                  <div className="flex justify-between text-sm items-center">
-                     <span>Returned Via:</span>
-                     <NeoBadge color={selectedSale.change_method === 'KPAY' ? 'bg-[#A2D2FF]' : 'bg-[#B0F2B4]'}>
-                        {selectedSale.change_method || 'CASH'}
-                     </NeoBadge>
-                  </div>
-                </div>
-              )}
-
-              {/* Net Impact */}
-              <div className="bg-blue-50 p-3 rounded border border-black">
-                 <p className="font-bold text-sm mb-2 uppercase text-blue-800">Net Balance Impact</p>
-                 <div className="flex justify-between mb-1">
-                    <span>Cash Drawer:</span>
-                    <span className={`font-mono font-bold ${selectedSale.cash_amount < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                      {selectedSale.cash_amount > 0 ? '+' : ''}{selectedSale.cash_amount.toLocaleString()} Ks
-                    </span>
-                 </div>
-                 <div className="flex justify-between">
-                    <span>KPay Balance:</span>
-                    <span className={`font-mono font-bold ${selectedSale.kpay_amount < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                       {selectedSale.kpay_amount > 0 ? '+' : ''}{selectedSale.kpay_amount.toLocaleString()} Ks
-                    </span>
-                 </div>
+                {selectedSale.payment_type === 'CASH' && (
+                  <>
+                    <div className="flex justify-between">
+                       <span>Cash In:</span>
+                       <span className="font-mono font-bold">{selectedSale.cash_received?.toLocaleString() || 0} Ks</span>
+                    </div>
+                    {(selectedSale.change_amount || 0) > 0 && (
+                      <div className="flex justify-between text-red-600 font-bold">
+                         <span>Change Returned:</span>
+                         <span>-{selectedSale.change_amount?.toLocaleString()} Ks</span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Items Table */}

@@ -1,5 +1,6 @@
 {
   "name": "Kyite POS (ကြိုက် POS)",
   "description": "A cute, neobrutalist POS system for Myanmar businesses with Cash/KPay support and simple inventory management.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

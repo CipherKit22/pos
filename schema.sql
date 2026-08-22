@@ -9,17 +9,22 @@ create table if not exists products (
   buy_price numeric not null default 0,
   sell_price numeric not null default 0,
   stock integer not null default 0,
-  image_url text
+  image_url text,
+  is_deleted boolean default false
 );
 
 -- Sales Table
 create table if not exists sales (
   id uuid primary key default uuid_generate_v4(),
+  customer_name text,
+  customer_phone text,
   total numeric not null,
   profit numeric not null,
-  payment_type text check (payment_type in ('CASH', 'KPAY', 'MIXED')),
-  cash_amount numeric default 0,
-  kpay_amount numeric default 0,
+  payment_type text, -- CASH, KBZPAY, WAVEPAY, AYAPAY
+  cash_amount numeric default 0, 
+  mobile_money_amount numeric default 0, 
+  cash_received numeric default 0,
+  change_amount numeric default 0,
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
@@ -72,26 +77,18 @@ $$ language plpgsql;
 
 do $$ 
 begin
-  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'cash_received') then
-    alter table sales add column cash_received numeric default 0;
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'customer_name') then
+    alter table sales add column customer_name text;
   end if;
 
-  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'kpay_received') then
-    alter table sales add column kpay_received numeric default 0;
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'customer_phone') then
+    alter table sales add column customer_phone text;
   end if;
 
-  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'change_amount') then
-    alter table sales add column change_amount numeric default 0;
+  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'mobile_money_amount') then
+    alter table sales add column mobile_money_amount numeric default 0;
   end if;
 
-  if not exists (select 1 from information_schema.columns where table_name = 'sales' and column_name = 'change_method') then
-    alter table sales add column change_method text check (change_method in ('CASH', 'KPAY', 'NONE')) default 'NONE';
-  end if;
-end $$;
-
--- --- SCHEMA UPDATES FOR SOFT DELETE ---
-do $$ 
-begin
   if not exists (select 1 from information_schema.columns where table_name = 'products' and column_name = 'is_deleted') then
     alter table products add column is_deleted boolean default false;
   end if;

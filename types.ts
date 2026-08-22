@@ -9,22 +9,21 @@ export interface Product {
   is_deleted?: boolean;
 }
 
-export type PaymentType = 'CASH' | 'KPAY' | 'MIXED' | 'CASH_WITH_KPAY_CHANGE';
+export type PaymentType = 'CASH' | 'KBZPAY' | 'WAVEPAY' | 'AYAPAY';
 
 export interface Sale {
   id: string;
+  customer_name?: string;
+  customer_phone?: string;
   total: number;
   profit: number;
   payment_type: PaymentType;
-  cash_amount: number; // Net cash (Received - Change)
-  kpay_amount: number; // Net kpay (Received - Change)
+  cash_amount: number; 
+  mobile_money_amount: number; 
   created_at: string;
   
-  // New Fields
   cash_received?: number;
-  kpay_received?: number;
   change_amount?: number;
-  change_method?: 'CASH' | 'KPAY' | null;
   
   sale_items?: SaleItem[];
 }
